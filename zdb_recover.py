@@ -8,13 +8,11 @@ examplePath = '/mnt/CROWN/user1/testing/boys_datasets3.txt'
 
 ### update printhelp
 def printHelp():
-    print("Usage:", "py wpd_save_post.py -u [POST URL] -o [OUTPUT DIR] -c cookies.txt\n\n"+
+    print("Usage:", "python zdb_recover.py -i [INPUT FILE] -o [OUTPUT FILE]\n\n"+
     "Arguments:\n", "  -h, --help\t\tdisplay this usage info\n",
-    "  -u, --url\t\tpost url\n",
-    "  -id, --id\t\tpost id\n",
-    "  -o, --output-dir\toutput directory\n",
-    "  -s, --session\tsession cookie\n",
-    "  -c, --cookies\tcookies file")
+    "  -i, --input-file\tinput file to copy\n",
+    "  -o, --output-file\tfile to copy to\n",
+    "  -X\t\t\toverwrite output file if exists\n")
     exit()
 
 def pathParse(path):
@@ -157,8 +155,3 @@ def main():
 
 if __name__=='__main__':
     main()
-
-# unexpected problems I encountered:
-# filesystem compression is not global (detect using ratio of physical/logical bytes)
-# the last block had extra data (count written bytes and slice output by bytecount of original file)
-# reading the binary from os.popen() (subprocess.popen didn't behave how I expected either..) (op.popen().buffer returns underlying binary buffer that's feeding the textiowrapper)
