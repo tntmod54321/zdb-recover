@@ -142,6 +142,17 @@ def main():
                 blockReadStatus = blockRead.close()
                 if blockReadStatus!=None: raise Exception(f"Error reading block {pointer['offset']} content")
                 
+                with open(path, 'rb') as IF:
+                    IF.seek(byteCounter)
+                    blockLen = re.match(r'^(\d{1,10})L', pointer['size'])
+                    if blockLen: blockLen=int(blockLen[1], 16)
+                    else: raise Exception('Error getting logical length of block')
+                    blockBin2 = IF.read(blockLen)
+                    
+                print(blockBin2==blockBin)
+                    
+                exit()
+                
                 f.write(blockBin[:tsize-byteCounter])
                 byteCounter+=len(blockBin[:tsize-byteCounter]) # count bytes excluding overshoot no the last block
                 print(f"({i}/{len(pointers)-1}) read {byteCounter} bytes total")
@@ -157,11 +168,6 @@ def main():
 
 if __name__=='__main__':
     main()
-
-# ABSOLUTELY NO WARRANTY, NO SUPPORT
-# DO NOT RUN THIS PROGRAM WITHOUT READING THROUGH THE SOURCE CODE UNLESS YOU'RE OK WITH LOSING EVERY BYTE OF YOUR DATA
-# verify that the output of this script is sane before using, try copying multiple types of known good files and verifying that the output is correct
-# only tested with TrueNAS-13.0-U2, with OpenZFS-2.1.5
 
 # unexpected problems I encountered:
 # filesystem compression is not global (detect using ratio of physical/logical bytes)
