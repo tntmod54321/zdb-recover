@@ -149,12 +149,15 @@ def main():
                     else: raise Exception('Error getting logical length of block')
                     blockBin2 = IF.read(blockLen)
                     
-                print(blockBin2==blockBin)
-                    
-                exit()
+                if not blockBin2[:tsize-byteCounter]==blockBin[:tsize-byteCounter]: raise Exception('Why tf aren\'t f.read and zdb -R the same??')
                 
-                f.write(blockBin[:tsize-byteCounter])
-                byteCounter+=len(blockBin[:tsize-byteCounter]) # count bytes excluding overshoot no the last block
+                if i==2:
+                    f.write(blockBin[:tsize-byteCounter])
+                    byteCounter+=len(blockBin[:tsize-byteCounter]) # count bytes excluding overshoot no the last block
+                else:
+                    f.write(blockBin2[:tsize-byteCounter])
+                    byteCounter+=len(blockBin2[:tsize-byteCounter]) # count bytes excluding overshoot no the last block
+                
                 print(f"({i}/{len(pointers)-1}) read {byteCounter} bytes total")
                 
                 previousOffset = int(pointer['fileoffset'], 16)
