@@ -6,7 +6,18 @@
 Verify that the output of this script is sane before using, try copying multiple types of known good files and verifying that the output is correct  .
 Only tested with TrueNAS-13.0-U2, with OpenZFS-2.1.5
 
-### unexpected problems I encountered:
+## Usage
+```
+Usage: python zdb_recover.py -i [INPUT FILE] -o [OUTPUT FILE]
+
+Arguments:
+   -h, --help           display this usage info
+   -i, --input-file     input file to copy
+   -o, --output-file    file to copy to
+   -X                   overwrite output file if exists
+```
+
+unexpected problems I encountered:
 * filesystem compression is not global (detect using ratio of physical/logical bytes)
 * the last block had extra data (count written bytes and slice output by bytecount of original file)
 * reading the binary from os.popen() (subprocess.popen didn't behave how I expected either..) (op.popen().buffer returns underlying binary buffer that's feeding the textiowrapper)
