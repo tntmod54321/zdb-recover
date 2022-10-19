@@ -121,7 +121,6 @@ def main():
                         raise Exception('Error, object block pointers being read out of order, not possible to properly reconstruct file') # it is possible you liar!!!     just not implemented.. 👉👈
                 
                 try:
-                    if i==2: raise OSError
                     IF.seek(byteCounter)
                     blockLen = re.match(r'^(\d{1,10})L', pointer['size'])
                     if blockLen: blockLen=int(blockLen[1], 16)
