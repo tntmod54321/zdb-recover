@@ -40,6 +40,7 @@ def getObjBlkPointers(path):
     command+=f"{path['relPath']}"
     
     cmdInfo = os.popen(command)
+    # objInfo = cmdInfo.readlines() # get pointers along with other info
     objInfo = cmdInfo.readlines() # get pointers along with other info
     
     objStatus = cmdInfo.close()
@@ -57,14 +58,23 @@ def getObjBlkPointers(path):
         if len(lineList)>1:
             if not re.match(r'L\d$', lineList[1]): continue # if not an LX pointer
             pointer = {
-                "level": lineList[1], # E.G. L0
-                "size": lineList[3], # physical/logical size
-                "vdev": lineList[2].split(':')[0],
-                "offset": lineList[2].split(':')[1], # offset of the block on the disk
-                "dumbsize": lineList[2].split(':')[2],
-                "fileoffset": lineList[0], # offset of this block from the start of the file
-                "checksums": lineList[6].strip().split('=')[1]
+                    "level": lineList[1], # E.G. L0
+                    "size": lineList[3], # physical/logical size
+                    "vdev": lineList[2].split(':')[0],
+                    "offset": lineList[2].split(':')[1], # offset of the block on the disk
+                    "dumbsize": lineList[2].split(':')[2],
+                    "fileoffset": lineList[0], # offset of this block from the start of the file
+                    "???": False,
             }
+            if len(lineList)>=7:
+                pointer['checksums'] = lineList[6].strip().split('=')[1]
+            else:
+                pointer['checksums'] = None
+                ### idk wtf this is, sometimes it will print like this:
+                #   1ef160000   L0 0:0:0 20000L B=104154
+                # idk what'd happen if you tried to read one of these with zdb,
+                # not my problem rn
+                pointer['???'] = True
             
             isC = re.match(r'([0-9a-fA-F]{1,20})L/([0-9a-fA-F]{1,20})P$', pointer['size'])
             if isC:
@@ -99,6 +109,8 @@ def main():
         if (arg in ["-X"]): overwrite = True
         i+=1
     if '' in [path, outfile]: printHelp()
+    
+    print('Starting...')
     
     pointers, mntPoint, tsize = getObjBlkPointers(path)
     
