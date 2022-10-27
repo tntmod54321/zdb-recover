@@ -163,7 +163,7 @@ def main():
                 
                 previousOffset = int(pointer['fileoffset'], 16)
                 i+=1
-    print(f'Successfilly transfered {os.path.split(path)[1]}! ({byteCounter} bytes, {badBlockCounter} damaged blocks)')
+    print(f'Successfully transfered {os.path.split(path)[1]}! ({byteCounter} bytes, {badBlockCounter} damaged blocks)')
 
 if __name__=='__main__':
     main()
