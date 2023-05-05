@@ -4,7 +4,7 @@
 ### ABSOLUTELY NO WARRANTY, NO SUPPORT.
 ### *DO NOT RUN THIS PROGRAM WITHOUT READING THROUGH THE SOURCE CODE UNLESS YOU'RE OK WITH LOSING EVERY BYTE OF YOUR DATA*  
 Verify that the output of this script is sane before using, try copying multiple types of known good files and verifying that the output is correct  .
-Only tested with TrueNAS-13.0-U2, with OpenZFS-2.1.5
+Only tested with TrueNAS-13.0-U2, with OpenZFS-2.1.5, and with Python 3.7+
 
 ## Usage
 ```
