@@ -19,7 +19,7 @@ Arguments:
 
 ## Example command
 ```
-python3 /mnt/Boys/audrey/zdb_recover.py -i /mnt/Boys/audrey/20201129_153851.mp4 -o /mnt/Boys/audrey/recovered.mp4
+python3 "/mnt/CROWN/user1/zdb_recover.py" -i "/mnt/CROWN/user1/20201129_153851.mp4" -o "/mnt/Boys/audrey/recovered.mp4"
 ```
 
 unexpected problems I encountered:
