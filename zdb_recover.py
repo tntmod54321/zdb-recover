@@ -23,6 +23,9 @@ def getObjBlkPointers(args):
     path = pathParse(
         args.input_file)
     
+    if args.debug:
+        print(f'\n[debug] parsed path is\n{path}\n')
+    
     command = ['zdb']
     
     if args.truenas:
@@ -33,6 +36,9 @@ def getObjBlkPointers(args):
         '-O', path["mntPoint"],
         path["relPath"]]
     
+    if args.debug:
+        print(f'[debug] get block pointers command is \n{command}\n')
+    
     # shouldn't need to escape spaces with subprocess.run
     proc = subprocess.Popen(command, stdout=subprocess.PIPE)
     
@@ -42,6 +48,11 @@ def getObjBlkPointers(args):
         objInfo.append(line)
     
     if proc.returncode != None:
+        if args.debug:
+            print('\n[debug] zdb -O command output')
+            for line in objInfo:
+                print(line.decode('utf-8'))
+            print()
         raise Exception('Unexpected zdb -O command response')
     
     # parse lines into L0 pointers
@@ -94,6 +105,10 @@ def getObjBlkPointers(args):
     
     if tsize == None:
         raise Exception('Unable to get total filesize')
+    
+    if args.debug:
+        print(f'[debug] total filesize is \n{tsize}')
+    
     return LX_POINTERS, path['mntPoint'], tsize
 
 def main(args):
@@ -106,6 +121,8 @@ def main(args):
     outfileExists = os.path.isfile(args.output_file)
     if not args.overwrite and outfileExists:
         raise Exception(f'Specified output file {args.output_file} already exists!')
+    if outfileExists and args.debug:
+        print('\n[debug] overwriting output file\n')
     
     with open(args.output_file, 'wb') as OF:
         with open(args.input_file, 'rb') as IF:
@@ -154,12 +171,16 @@ def main(args):
                         blockBin += data
                     
                     if proc.returncode != None:
+                        if args.debug:
+                            print(f'\n[debug] printing -R command output\n')
+                            for line in blockBin.splitlines():
+                                print(line.decode('utf-8'))
                         raise Exception('Unexpected zdb -R command response')
                 
                 OF.write(blockBin[:tsize - byteCounter])
                 byteCounter+=len(blockBin[:tsize - byteCounter]) # count bytes excluding overshoot no the last block
                 
-                print(f"({i}/{len(pointers) - 1}) read {byteCounter} bytes total")
+                print(f"({i}/{len(pointers)}) read {byteCounter} bytes total")
                 
                 previousOffset = int(pointer['fileoffset'], 16)
                 i+=1
@@ -172,6 +193,7 @@ if __name__=='__main__':
     parser.add_argument('-o', '--output-file', default=None, help='output file to write')
     parser.add_argument('-X', '--overwrite', action='store_true', help='overwrite output file if exists')
     parser.add_argument('-t', '--truenas', action='store_true', help='use this flag if your ZFS install is on Truenas')
+    parser.add_argument('--debug', action='store_true', help='use this flag to print debug informations')
     
     args = parser.parse_args()
     
