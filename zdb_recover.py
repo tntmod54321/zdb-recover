@@ -1,62 +1,63 @@
+import argparse
 import os
-import sys
 import re
-
-isTruenas = True
-
-examplePath = '/mnt/CROWN/user1/testing/boys_datasets3.txt'
-
-### update printhelp
-def printHelp():
-    print("Usage:", "python zdb_recover.py -i [INPUT FILE] -o [OUTPUT FILE]\n\n"+
-    "Arguments:\n", "  -h, --help\t\tdisplay this usage info\n",
-    "  -i, --input-file\tinput file to copy\n",
-    "  -o, --output-file\tfile to copy to\n",
-    "  -X\t\t\toverwrite output file if exists\n")
-    exit()
+import subprocess
 
 def pathParse(path):
-    mntPoint = re.match(r'/mnt/([^/\\]+)/', path)
-    if mntPoint: mntPoint=mntPoint[1]
-    else: raise Exception('Unable to extract mountpoint')
+    # match /mnt/{mountpoint}/
+    mntPoint = path.split('/mnt/')[1].split('/')[0]
+    if not mntPoint:
+        raise Exception('Unable to extract mountpoint')
     
-    relPath = re.match(r'/mnt/[^/]+/(.+)', path)
-    if relPath: relPath=relPath[1]
-    else: raise Exception('Unable to extract mountpoint\'s relative path')
+    # match /mnt/{mountpoint/{relative path}
+    relPath = path.split(f'/mnt/{mntPoint}/')[1]
+    if not relPath:
+        raise Exception('Unable to extract mountpoint\'s relative path')
     
     return {
         'abslPath': path, 'relPath': relPath, # relative to the mountpoint
-        'mntPoint': mntPoint, 'filename': os.path.basename(path)
+        'mntPoint': mntPoint, 'filename': os.path.split(path)[1]
     }
 
-def getObjBlkPointers(path):
-    path = path.replace(' ','\ ') # sanitize spaces
-    path = pathParse(path)
+def getObjBlkPointers(args):
+    path = pathParse(
+        args.input_file)
     
-    # form command
-    command = 'zdb '
-    if isTruenas: command+='-U /data/zfs/zpool.cache ' # non boot-pool pools are cached here
-    command+=f"-vv -O {path['mntPoint']} " # specify pool, two levels of verbosity to print block pointers, L0 blocks are raw block data
-    command+=f"{path['relPath']}"
+    command = ['zdb']
     
-    cmdInfo = os.popen(command)
-    # objInfo = cmdInfo.readlines() # get pointers along with other info
-    objInfo = cmdInfo.readlines() # get pointers along with other info
+    if args.truenas:
+        command += ['-U', '/data/zfs/zpool.cache']
     
-    objStatus = cmdInfo.close()
-    if objStatus != None: raise Exception('Unexpected zdb -O command response')
+    command += [
+        '-vv',
+        '-O', path["mntPoint"],
+        path["relPath"]]
+    
+    # shouldn't need to escape spaces with subprocess.run
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE)
+    
+    # read-in lines
+    objInfo = []
+    for line in proc.stdout:
+        objInfo.append(line)
+    
+    if proc.returncode != None:
+        raise Exception('Unexpected zdb -O command response')
     
     # parse lines into L0 pointers
     LX_POINTERS=[]
     tsize=None
     for line in objInfo:
-        if line.strip() == '': continue
+        line = line.decode('utf-8')
+        if line.strip() == '':
+            continue
         lineList=[]
         for part in line.split(' '):
             if part!='': lineList.append(part)
         
         if len(lineList)>1:
-            if not re.match(r'L\d$', lineList[1]): continue # if not an LX pointer
+            if not re.match(r'L\d$', lineList[1]):  
+                continue # if not an LX pointer
             pointer = {
                     "level": lineList[1], # E.G. L0
                     "size": lineList[3], # physical/logical size
@@ -86,84 +87,97 @@ def getObjBlkPointers(path):
         
         else:
             lineList = lineList[0].split('\t')
-            if not len(lineList)>1: continue
-            if lineList[1]=='size': tsize = int(lineList[2].strip())
+            if not len(lineList) > 1:
+                continue
+            if lineList[1] == 'size':
+                tsize = int(lineList[2].strip())
     
-    if tsize==None: raise Exception('Unable to get total filesize')
+    if tsize == None:
+        raise Exception('Unable to get total filesize')
     return LX_POINTERS, path['mntPoint'], tsize
 
-def main():
+def main(args):
     # zdb -U /data/zfs/zpool.cache -R Boys 0:156ecb3f5000:20000L/8000P:rd > /mnt/Boys/audrey/testing/browserhist_l0_0_raw1_2.txt
     # python /mnt/Boys/audrey/testing/zdb_recover.py -i "/mnt/Boys/audrey/2022.09.15 centbrowser history" -o "/mnt/Boys/audrey/testing/dump.bin"
     
-    path = ''
-    outfile = ''
-    overwrite = False
-    
-    if len(sys.argv[1:]) == 0: printHelp()
-    i=1 # for arguments like [--command value] get the value after the command
-    for arg in sys.argv[1:]: # first arg in sys.argv is the python file
-        if (arg in ["help", "/?", "-h", "--help"]): printHelp()
-        if (arg in ["-i", "--in-file"]): path = sys.argv[1:][i]
-        if (arg in ["-o", "--out-file"]): outfile = sys.argv[1:][i]
-        if (arg in ["-X"]): overwrite = True
-        i+=1
-    if '' in [path, outfile]: printHelp()
-    
     print('Starting...')
+    pointers, mntPoint, tsize = getObjBlkPointers(args)
     
-    pointers, mntPoint, tsize = getObjBlkPointers(path)
+    outfileExists = os.path.isfile(args.output_file)
+    if not args.overwrite and outfileExists:
+        raise Exception(f'Specified output file {args.output_file} already exists!')
     
-    pathExists = os.path.exists(outfile)
-    if not overwrite and pathExists: raise Exception(f'Specified output file {outfile} already exists!')
-    if not pathExists and not os.path.exists(os.path.split(outfile)[0]): os.makedirs(os.path.split(outfile)[0])
-    
-    with open(outfile, 'wb') as OF:
-        with open(path, 'rb') as IF:
+    with open(args.output_file, 'wb') as OF:
+        with open(args.input_file, 'rb') as IF:
             previousOffset=None
             i=1
             byteCounter=0
             badBlockCounter=0
             for pointer in pointers:
                 if pointer['level'] != 'L0': continue # skip non-data pointers
-                if previousOffset!=None: # check previous offset
-                    if not int(pointer['fileoffset'], 16)>previousOffset:
+                if previousOffset != None: # check previous offset
+                    if not int(pointer['fileoffset'], 16) > previousOffset:
                         raise Exception('Error, object block pointers being read out of order, not possible to properly reconstruct file') # it is possible you liar!!!     just not implemented.. 👉👈
                 
                 try:
                     IF.seek(byteCounter)
                     blockLen = re.match(r'^(\d{1,10})L', pointer['size'])
-                    if blockLen: blockLen=int(blockLen[1], 16)
-                    else: raise Exception('Error getting logical length of block')
+                    if blockLen:
+                        blockLen=int(blockLen[1], 16)
+                    else:
+                        raise Exception('Error getting logical length of block')
                     blockBin = IF.read(blockLen)
                 except OSError as e:
-                    if not 'Input/output error' in str(e): raise e
+                    if not 'Input/output error' in str(e):
+                        raise e
                     badBlockCounter+=1
                     print(f'block {i} is damaged')
                     
+                    if pointer['isCompressed'] == None:
+                        raise Exception('undefined block physical/logical bytes ratio?')
+                    
                     # form command to read block
-                    command = 'zdb '
-                    if isTruenas: command+='-U /data/zfs/zpool.cache ' # non boot-pool pools are cached here
-                    command+=f'-R {mntPoint} '
-                    command+=f"{pointer['vdev']}:{pointer['offset']}:{pointer['size']}:r"
+                    command = ['zdb']
+                    if args.truenas:
+                        command += ['-U', '/data/zfs/zpool.cache']
                     
-                    if pointer['isCompressed']==True: command+='d' # add decompress flag if compression is detected in this block
-                    elif pointer['isCompressed']==False: pass
-                    elif pointer['isCompressed']==None: raise Exception('undefined block physical/logical bytes ratio?')
+                    command += [
+                        '-R', mntPoint,
+                        f"{pointer['vdev']}:{pointer['offset']}:{pointer['size']}:r{'d' if pointer['isCompressed'] else ''}"
+                    ]
                     
-                    blockRead = os.popen(command) # read block from disk
-                    blockBin = blockRead.buffer.read() # read the underlying buffer that the textiowrapper is using so we don't have issues encoding to bytes 😏
-                    blockReadStatus = blockRead.close()
-                    if blockReadStatus!=None: raise Exception(f"Error reading block {pointer['offset']} content")
+                    proc = subprocess.Popen(command, stdout=subprocess.PIPE)
+                    
+                    # read-in binary
+                    blockBin = bytes()
+                    for data in proc.stdout:
+                        blockBin += data
+                    
+                    if proc.returncode != None:
+                        raise Exception('Unexpected zdb -R command response')
                 
-                OF.write(blockBin[:tsize-byteCounter])
-                byteCounter+=len(blockBin[:tsize-byteCounter]) # count bytes excluding overshoot no the last block
+                OF.write(blockBin[:tsize - byteCounter])
+                byteCounter+=len(blockBin[:tsize - byteCounter]) # count bytes excluding overshoot no the last block
                 
-                print(f"({i}/{len(pointers)-1}) read {byteCounter} bytes total")
+                print(f"({i}/{len(pointers) - 1}) read {byteCounter} bytes total")
                 
                 previousOffset = int(pointer['fileoffset'], 16)
                 i+=1
-    print(f'Successfully transfered {os.path.split(path)[1]}! ({byteCounter} bytes, {badBlockCounter} damaged blocks)')
+    print(f'Successfully copied {os.path.split(args.input_file)[1]}! ({byteCounter} bytes, {badBlockCounter} damaged blocks)')
 
 if __name__=='__main__':
-    main()
+    # parse args
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input-file', default=None, help='input file to read')
+    parser.add_argument('-o', '--output-file', default=None, help='output file to write')
+    parser.add_argument('-X', '--overwrite', action='store_true', help='overwrite output file if exists')
+    parser.add_argument('-t', '--truenas', action='store_true', help='use this flag if your ZFS install is on Truenas')
+    
+    args = parser.parse_args()
+    
+    if None in [args.input_file, args.output_file]:
+        parser.print_help()
+        print('\nTHE INPUT AND OUTPUT FILE ARGUMENTS ARE NOT OPTIONAL.')
+        exit()
+    
+    main(args)
