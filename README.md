@@ -7,6 +7,7 @@ Verify that the output of this script is sane before using, try copying multiple
 Only tested with TrueNAS-13.0-U2, with OpenZFS-2.1.5, and with Python 3.7+
 
 ## Usage
+Make sure to use -t if this is on a truenas system, truenas stores `zpool.cache` in a non-default location, which `zdb` requires to interface with pools.
 ```
 usage: zdb_recover.py [-h] [-i INPUT_FILE] [-o OUTPUT_FILE] [-X] [-t]
 
